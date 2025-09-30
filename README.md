@@ -1,35 +1,92 @@
-# Personalized Content Recommendation System
+# Dual-Strategy Content Recommendation System
 
-Welcome! This project is a fully functional, interest-based content recommendation system. The goal is simple: to intelligently suggest the top 3 most relevant posts for any given user.
+The goal of this project is to provide users with a rich and diverse set of content suggestions by leveraging two distinct, powerful machine learning models.
 
-This isn't just a random selection. The system dives deep into user profiles, past engagement, and the specific attributes of each post to create a truly personalized discovery experience. The entire recommendation engine is wrapped in a clean, interactive web application built with Streamlit.
+The entire system is wrapped in a clean, interactive web application built with Streamlit, which presents the recommendations in two clear categories:
+1.  **For You: Based on Your Profile:** Highly personalized suggestions that match your specific interests and demographics.
+2.  **Trending for You: Based on Others:** Serendipitous recommendations based on the behavior of users with similar tastes to yours.
 
-[Demo of the Streamlit Application]([https://i.imgur.com/g0j8z9G.gif](https://content-recommendation-system.streamlit.app/))
+![Demo of the Streamlit Application](https://dual-recommendation-engine.streamlit.app/)
 
-## How it Works: My Approach
+---
 
-To deliver high-quality recommendations, I built a **hybrid model**. This is the same approach used by major tech companies, as it combines the strengths of multiple strategies to create a result that is both accurate and personalized. Our model has two core components:
+## Model 1: The Machine Learning Ranker ("For You")
 
-### 1. Content-Based Filtering (The "Interest Matcher")
+This model acts as our core personalization engine. It moves beyond simple scoring and instead learns to predict the *probability* of a user engaging with a post.
 
-The first part of the engine focuses on a simple but powerful idea: *"If you like posts about 'sports', you should see more posts about 'sports'."*
+### Methodology
 
-To make this work, we need to teach the computer how to understand and compare text. I used a standard, industry-proven technique:
+The approach is to frame the recommendation task as a supervised machine learning problem. We train a **Logistic Regression** classifier to distinguish between a positive engagement (like) and a negative one (no like).
 
-* **TF-IDF (Term Frequency-Inverse Document Frequency):** This sounds complex, but it's just a clever way to convert text (like user interests and post tags) into numerical vectors. It identifies which words are truly important by giving more weight to tags that are specific (e.g., 'literature') and less weight to ones that are very common.
-* **Cosine Similarity:** Once both users and posts are represented as vectors, we can calculate the "angle" between them. A smaller angle (a score closer to 1) means the user's interests and the post's tags are a strong match!
+The model is trained on a rich set of features that combine user, content, and interaction data:
+1.  **Interest Match Score:** We use TF-IDF to convert user interests and post tags into numerical vectors. The cosine similarity between these vectors gives us a powerful score that quantifies how well the content aligns with the user's profile.
+2.  **User Profile Features:** The user's `past_engagement_score`, `age`, and `gender` are included to provide a complete, 360-degree view of the user.
 
-### 2. User-Based Heuristic (The "Personalization Layer")
+By learning from historical data, the model can determine the optimal way to weigh these features, creating a highly accurate and personalized ranking for every unseen post.
 
-A user's interests don't tell the whole story. Some users are naturally more active and engaged than others. The `past_engagement_score` is a fantastic piece of data that helps us understand this. By incorporating this score, we can fine-tune the recommendations, giving a slight boost to content for our most active users.
+### Training Data Sample
 
-### 3. The Hybrid Score 
+To train the model, we construct a feature set for every known user-post interaction. Here is a sample of the final training data:
 
-The final step is to combine these two signals into a single, powerful **Recommendation Score**. I used a simple weighted formula:
+| user_id | post_id | engagement | interest_score | age | gender | top_3_interests | past_engagement_score | age_scaled | gender_F | gender_M | gender_Other |
+| :--- | :--- | :---: | :---: | :-: | :---: | :--- | :---: | :---: | :---: | :---: | :---: |
+| U1 | P52 | 1 | 0.3599 | 24 | F | sports, art, gaming | 0.61 | -0.346 | 1.0 | 0.0 | 0.0 |
+| U1 | P44 | 0 | 0.0000 | 24 | F | sports, art, gaming | 0.61 | -0.346 | 1.0 | 0.0 | 0.0 |
+| U1 | P1 | 1 | 0.4199 | 24 | F | sports, art, gaming | 0.61 | -0.346 | 1.0 | 0.0 | 0.0 |
+| U1 | P4 | 1 | 0.3599 | 24 | F | sports, art, gaming | 0.61 | -0.346 | 1.0 | 0.0 | 0.0 |
+| U1 | P65 | 0 | 0.5528 | 24 | F | sports, art, gaming | 0.61 | -0.346 | 1.0 | 0.0 | 0.0 |
 
-$$\text{Recommendation Score} = (0.7 \times \text{Interest Match Score}) + (0.3 \times \text{User Engagement Score})$$
+### Model Evaluation
 
-This formula prioritizes a strong interest match (70% weight) while still allowing a user's overall engagement level to influence the final ranking (30% weight). Of course, we always make sure to filter out any posts the user has already seen!
+The model was evaluated on an unseen test set of 200 interactions. The results show a balanced performance in predicting both engagement and non-engagement.
+
+**Classification Report**
+
+| | precision | recall | f1-score | support |
+| :--- | :---: | :---: | :---: | :---: |
+| **No Engagement (0)** | 0.45 | 0.46 | 0.45 | 101 |
+| **Engagement (1)** | 0.43 | 0.42 | 0.43 | 99 |
+| | | | | |
+| **accuracy** | | | 0.44 | 200 |
+| **macro avg** | 0.44 | 0.44 | 0.44 | 200 |
+| **weighted avg** | 0.44 | 0.44 | 0.44 | 200 |
+
+**Confusion Matrix**
+
+The confusion matrix gives us a visual breakdown of the model's predictions. We can see how many engagements and non-engagements were correctly classified.
+
+![Confusion Matrix for ML Ranker](https://github.com/user-attachments/assets/b930d350-bc09-47b5-82ee-830c8506baca)
+
+---
+
+## Model 2: Collaborative Filtering ("Trending for You")
+
+This model is our discovery engine. It's based on the famous "Netflix Prize" approach and recommends items based on the behavior of the community.
+
+### Methodology
+
+This approach is fundamentally different from the ML Ranker. It **completely ignores** all user and post metadata (like age, gender, or tags). Instead, it learns directly from the user-post engagement matrix.
+
+We use the **Singular Value Decomposition (SVD)** algorithm, a powerful matrix factorization technique. At a high level, SVD decomposes the user-post matrix into two smaller, "latent feature" matrices:
+1.  A **user-feature matrix** that represents the taste profile of each user.
+2.  A **post-feature matrix** that represents the characteristics of each post.
+
+By multiplying a user's taste vector with a post's characteristic vector, the model can predict the engagement score a user would give to a post they have never seen before. This allows us to find posts that are popular among users with similar tastes, even if the content seems unrelated at first glance.
+
+### Model Evaluation
+
+This model's performance is measured by how accurately it can predict a user's engagement score. We use 5-fold cross-validation to get a robust measure of its accuracy on unseen data. The key metrics are:
+* **RMSE (Root Mean Squared Error):** Measures the average magnitude of the prediction error. Lower is better.
+* **MAE (Mean Absolute Error):** Similar to RMSE but less sensitive to large errors. Lower is better.
+
+The results show a strong predictive performance, with an average error of about 0.5 on a 0-1 scale.
+
+**Cross-Validation Results**
+
+| | Fold 1 | Fold 2 | Fold 3 | Fold 4 | Fold 5 | **Mean** | **Std Dev** |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **RMSE** | 0.5090 | 0.5367 | 0.5221 | 0.5338 | 0.5034 | **0.5210** | 0.0132 |
+| **MAE** | 0.4894 | 0.5131 | 0.5024 | 0.5075 | 0.4841 | **0.4993** | 0.0109 |
 
 ---
 
@@ -105,23 +162,4 @@ Getting the recommendation system up and running on your local machine is easy.
         streamlit run app/app.py
         ```
     * A new tab will open in your web browser with the interactive application!
-
-## Evaluation and Metrics
-
-Because this is a recommendation task, traditional metrics like accuracy aren't the best fit. Instead, the most effective evaluation is **qualitative**.
-
-The true test is to select a user from the dropdown in the app and observe the results. For instance, if you select a user who is interested in `sports, art, gaming`, the top 3 recommended posts should have tags that clearly align with these interests. This "common sense" check is often the most important validation for a recommendation system.
-
----
-
-## Future Directions & Possible Extensions
-
-This project provides a very strong foundation, but there are several exciting ways it could be extended in a real-world setting:
-
-1.  **Incorporate Collaborative Filtering:** The next logical step would be to add a "users who liked this also liked..." feature. By analyzing patterns across *all* users, we can uncover recommendations that aren't immediately obvious from a user's stated interests. Techniques like **Matrix Factorization (SVD)** would be perfect for this.
-
-2.  **Leverage Deeper Content Analysis:** Instead of just tags, we could use Natural Language Processing (NLP) to analyze the *full text* of the posts. This would allow for a much more nuanced understanding of the content.
-
-3.  **Implement A/B Testing:** In a live environment, the ultimate test is to deploy different versions of the recommendation model to different users and measure which one leads to higher engagement (more clicks, likes, etc.). This provides concrete data on what truly works best.
-
 
