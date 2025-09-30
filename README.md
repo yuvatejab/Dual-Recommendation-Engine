@@ -6,7 +6,7 @@ The entire system is wrapped in a clean, interactive web application built with 
 1.  **For You: Based on Your Profile:** Highly personalized suggestions that match your specific interests and demographics.
 2.  **Trending for You: Based on Others:** Serendipitous recommendations based on the behavior of users with similar tastes to yours.
 
-![Demo of the Streamlit Application]([https://i.imgur.com/g0j8z9G.gif](https://dual-recommendation-engine.streamlit.app/))
+[![Demo of the Streamlit Application](https://i.imgur.com/g0j8z9G.gif)](https://dual-recommendation-engine.streamlit.app/)
 
 ---
 
